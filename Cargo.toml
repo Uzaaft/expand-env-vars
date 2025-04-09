@@ -1,7 +1,16 @@
 [package]
 name = "expand-env-vars"
+description = "Cross-platform environment variable expander for Rust (supports $VAR, ${VAR}, and %VAR%)"
 version = "0.1.0"
 edition = "2024"
+authors = ["Uzair Aftab <uzaaft@outlook.com>"]
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/uzaaft/expand-env-vars"
+homepage = "https://github.com/uzaaft/expand-env-vars"
+documentation = "https://docs.rs/expand-env-vars"
+keywords = ["environment", "variables", "unix", "windows", "expansion"]
+
 
 [dependencies]
 regex = "1.11.1"
