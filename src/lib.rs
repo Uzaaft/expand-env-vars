@@ -116,10 +116,13 @@ pub fn expand_env_vars(input: &str) -> Result<String, EnvExpansionError> {
 pub mod regex {
     use regex::Regex;
 
-    use std::env;
+    use std::{env, sync::LazyLock};
 
     use super::EnvExpansionError;
     use std::fmt;
+
+    static UNIX_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$(\w+)|\$\{(\w+)\}").unwrap());
+    static WINDOWS_RE: LazyLock<Regex> = LazyLock::new(||Regex::new(r"%(\w+)%").unwrap());
 
     /// Expands environment variable placeholders in a string with actual environment values with
     /// regex.
@@ -135,8 +138,7 @@ pub mod regex {
     pub fn expand_env_vars(input: &str) -> Result<String, EnvExpansionError> {
         #[cfg(unix)]
         {
-            let unix_re = Regex::new(r"\$(\w+)|\$\{(\w+)\}").unwrap();
-            let result = unix_re.replace_all(input, |caps: &regex::Captures| {
+            let result = UNIX_RE.replace_all(input, |caps: &regex::Captures| {
                 let var_name = caps
                     .get(1)
                     .or_else(|| caps.get(2))
@@ -149,8 +151,7 @@ pub mod regex {
 
         #[cfg(windows)]
         {
-            let windows_re = Regex::new(r"%(\w+)%").unwrap();
-            let result = windows_re.replace_all(input, |caps: &regex::Captures| {
+            let result = WINDOWS_RE.replace_all(input, |caps: &regex::Captures| {
                 let var_name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
                 env::var(var_name).unwrap_or_default()
             });
