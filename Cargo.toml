@@ -13,4 +13,7 @@ keywords = ["environment", "variables", "unix", "windows", "expansion"]
 
 
 [dependencies]
-regex = "1.11.1"
+regex = { version = "1.11.1", features = [], optional = true }
+
+[features]
+regex = ["dep:regex"]

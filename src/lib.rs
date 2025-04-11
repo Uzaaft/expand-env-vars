@@ -3,8 +3,6 @@
 
 use std::env;
 
-use regex::Regex;
-
 use std::fmt;
 
 /// Custom error type for environment variable expansion.
@@ -38,26 +36,120 @@ impl std::error::Error for EnvExpansionError {}
 pub fn expand_env_vars(input: &str) -> Result<String, EnvExpansionError> {
     #[cfg(unix)]
     {
-        let unix_re = Regex::new(r"\$(\w+)|\$\{(\w+)\}").unwrap();
-        let result = unix_re.replace_all(input, |caps: &regex::Captures| {
-            let var_name = caps
-                .get(1)
-                .or_else(|| caps.get(2))
-                .map(|m| m.as_str())
-                .unwrap_or("");
-            env::var(var_name).unwrap_or_default()
-        });
-        Ok(result.into_owned())
+        let mut result = String::with_capacity(input.len());
+        let chars: Vec<char> = input.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            if chars[i] == '$' {
+                if i + 1 < chars.len() && chars[i + 1] == '{' {
+                    // Handle ${VAR}
+                    let mut j = i + 2;
+                    while j < chars.len() && chars[j] != '}' {
+                        j += 1;
+                    }
+
+                    if j < chars.len() {
+                        let var_name: String = chars[i + 2..j].iter().collect();
+                        let val = env::var(&var_name).unwrap_or_default();
+                        result.push_str(&val);
+                        i = j + 1;
+                    } else {
+                        // No closing brace, treat as literal
+                        result.push('$');
+                        i += 1;
+                    }
+                } else {
+                    // Handle $VAR
+                    let mut j = i + 1;
+                    while j < chars.len() && chars[j].is_ascii_alphanumeric() || chars[j] == '_' {
+                        j += 1;
+                    }
+                    let var_name: String = chars[i + 1..j].iter().collect();
+                    let val = env::var(&var_name).unwrap_or_default();
+                    result.push_str(&val);
+                    i = j;
+                }
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        }
+
+        Ok(result)
     }
 
     #[cfg(windows)]
     {
-        let windows_re = Regex::new(r"%(\w+)%").unwrap();
-        let result = windows_re.replace_all(input, |caps: &regex::Captures| {
-            let var_name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            env::var(var_name).unwrap_or_default()
-        });
-        result.into_owned()
+        let mut result = String::with_capacity(input.len());
+        let chars: Vec<char> = input.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            if chars[i] == '%' {
+                let mut j = i + 1;
+                while j < chars.len() && chars[j] != '%' {
+                    j += 1;
+                }
+
+                if j < chars.len() {
+                    let var_name: String = chars[i + 1..j].iter().collect();
+                    let val = env::var(&var_name).unwrap_or_default();
+                    result.push_str(&val);
+                    i = j + 1;
+                } else {
+                    // No closing %, treat as literal
+                    result.push('%');
+                    i += 1;
+                }
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        }
+
+        Ok(result)
+    }
+}
+
+#[cfg(feature = "regex")]
+mod regex {
+    use regex::Regex;
+    /// Expands environment variable placeholders in a string with actual environment values with
+    /// regex.
+    ///
+    /// - On **Unix**, supports `$VAR` and `${VAR}`.
+    /// - On **Windows**, supports `%VAR%`.
+    ///
+    /// # Errors
+    ///
+    /// Currently, missing variables are replaced with an empty string.
+    /// A stricter mode can be implemented later to return an error for missing variables.
+    ///
+    pub fn expand_env_vars(input: &str) -> Result<String, EnvExpansionError> {
+        #[cfg(unix)]
+        {
+            let unix_re = Regex::new(r"\$(\w+)|\$\{(\w+)\}").unwrap();
+            let result = unix_re.replace_all(input, |caps: &regex::Captures| {
+                let var_name = caps
+                    .get(1)
+                    .or_else(|| caps.get(2))
+                    .map(|m| m.as_str())
+                    .unwrap_or("");
+                env::var(var_name).unwrap_or_default()
+            });
+            Ok(result.into_owned())
+        }
+
+        #[cfg(windows)]
+        {
+            let windows_re = Regex::new(r"%(\w+)%").unwrap();
+            let result = windows_re.replace_all(input, |caps: &regex::Captures| {
+                let var_name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+                env::var(var_name).unwrap_or_default()
+            });
+            result.into_owned()
+        }
     }
 }
 
