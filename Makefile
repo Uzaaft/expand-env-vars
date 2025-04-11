@@ -1,2 +1,2 @@
 test:
-	RUST_TEST_THREADS=1 cargo test
+	RUST_TEST_THREADS=1 cargo test --features=regex
